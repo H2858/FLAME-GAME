@@ -1772,6 +1772,20 @@ export class GameEngine2D {
       ctx.drawImage(image, this.cameraX + (width - dw) / 2, this.cameraY + (height - dh) / 2, dw, dh);
       ctx.restore();
     }
+
+    // World 03's small plant layer sits in front of the supplied ground artwork.
+    if (world === 'world03') {
+      const plant = this.craftpixWorldAssets['world03/plant.png'];
+      if (plant?.complete && plant.naturalWidth > 0) {
+        const scale = Math.max(width / plant.naturalWidth, height / plant.naturalHeight);
+        const dw = plant.naturalWidth * scale;
+        const dh = plant.naturalHeight * scale;
+        ctx.save();
+        ctx.globalAlpha = 0.96;
+        ctx.drawImage(plant, this.cameraX + (width - dw) / 2, this.cameraY + (height - dh) / 2, dw, dh);
+        ctx.restore();
+      }
+    }
   }
 
   private render() {
@@ -1785,8 +1799,6 @@ export class GameEngine2D {
       offsetX += (Math.random() - 0.5) * this.screenShakeAmount;
       offsetY += (Math.random() - 0.5) * this.screenShakeAmount;
     }
-
-    const palette = this.getActPalette();
 
     // One Craftpix environment is selected for each consecutive group of five stages.
     this.renderCraftpixBackdrop(ctx, width, height);
