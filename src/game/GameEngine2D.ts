@@ -361,7 +361,7 @@ export class GameEngine2D {
     const world01Files = [
       '01_sky_base.png', '02_moon.png', '03_clouds_far.png', '04_clouds_near.png',
       '05_mountains_far.png', '06_mountains_near.png', '07_royal_citadel.png',
-      '08_midground_city.png', '09_foreground_architecture.png', '10_palm_trees.png',
+      '08_midground_city.png', '09_foreground_architecture.png',
       '11_vegetation.png', '12_stone_floor.png',
     ];
     for (const file of world01Files) {
@@ -369,10 +369,11 @@ export class GameEngine2D {
       image.src = `/assets/world01/${file}`;
       this.world01Assets[file] = image;
     }
-    // Individual transparent sprites extracted from the palm/vegetation sheets.
-    for (let i = 1; i <= 12; i++) {
-      const file = `palm_${String(i).padStart(2, '0')}.png`;
-      const image = new Image(); image.src = `/assets/world01/sprites/${file}`;
+    // Ten complete, user-supplied palm images. Each file is loaded whole; no spritesheet cropping.
+    for (let i = 1; i <= 10; i++) {
+      const file = `palm_new_${String(i).padStart(2, '0')}.png`;
+      const image = new Image();
+      image.src = `/assets/world01/palms-new/${file}`;
       this.world01Assets[file] = image;
     }
     for (let i = 1; i <= 16; i++) {
@@ -1756,7 +1757,7 @@ export class GameEngine2D {
   /** Draws a deterministic row of individually loaded transparent props in screen space. */
   private drawWorld01SpriteRow(
     ctx: CanvasRenderingContext2D,
-    prefix: 'palm' | 'plant',
+    prefix: 'palm-new' | 'plant',
     count: number,
     baseY: number,
     spacing: number,
@@ -1770,7 +1771,9 @@ export class GameEngine2D {
     ctx.globalAlpha = alpha;
     for (let slot = first; slot <= last; slot++) {
       const positive = ((slot % count) + count) % count;
-      const file = `${prefix}_${String(positive + 1).padStart(2, '0')}.png`;
+      const file = prefix === 'palm-new'
+        ? `palm_new_${String(positive + 1).padStart(2, '0')}.png`
+        : `plant_${String(positive + 1).padStart(2, '0')}.png`;
       const image = this.world01Assets[file];
       if (!image?.complete || image.naturalWidth === 0) continue;
       const variation = 0.78 + (((slot * 17 + 31) % 7 + 7) % 7) * 0.075;
@@ -1841,7 +1844,7 @@ export class GameEngine2D {
     // trunks and crowns remain completely visible instead of being hidden by roofs.
     this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.38, 0.16, 1, true, true);
     this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.38, 0.16, 1, true, true);
-    this.drawWorld01SpriteRow(ctx, 'palm', 12, horizon + height * 0.075, 310, 0.12, height * 0.52, 1);
+    this.drawWorld01SpriteRow(ctx, 'palm-new', 10, horizon + height * 0.075, 310, 0.12, height * 0.52, 1);
   }
 
   /** Continuous stone plaza between the fixed Arabic city and the rolling playfield. */
