@@ -2574,6 +2574,167 @@ export class GameEngine2D {
   }
 
 
+  private renderHeroFlame(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    const flicker1 = Math.sin(this.flameTimer * 16) * 4;
+    const solar = this.flameSkin === 'solar';
+    const flicker2 = Math.cos(this.flameTimer * (solar ? 27 : 22)) * 5;
+    const outerTop = solar ? '#fff5c7' : '#dffcff';
+    const outerMid = solar ? '#ffcf70' : '#67e8f9';
+    const outerDeep = solar ? '#f97316' : '#0284c7';
+    const innerMid = solar ? '#fbbf24' : '#67e8f9';
+    const innerDeep = solar ? '#ea580c' : '#06b6d4';
+    const glowColor = solar ? '#fb923c' : '#0ea5e9';
+
+    let scaleX = 1.0;
+    let scaleY = 1.0;
+    if (this.isDashing) {
+      scaleX = 1.6;
+      scaleY = 0.65;
+    } else if (!this.isGrounded) {
+      scaleY = 1.25;
+      scaleX = 0.82;
+    }
+    ctx.scale(scaleX * this.facing, scaleY);
+
+    // Orbital Wisps: unlockable rotating guard-blades around the hero.
+    if (false && this.skills.orbitalWisps > 1 && !this.isHorizontalFlightActive) {
+      const wispCount = Math.min(5, 2 + this.skills.orbitalWisps);
+      for (let i = 0; i < wispCount; i++) {
+        const angle = this.flameTimer * 2.4 + (i / wispCount) * Math.PI * 2;
+        const ox = Math.cos(angle) * 43;
+        const oy = -4 + Math.sin(angle) * 25;
+        ctx.save(); ctx.translate(ox, oy); ctx.rotate(angle + Math.PI / 2);
+        ctx.fillStyle = '#a5f3fc'; ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = 16;
+        ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(5, 0); ctx.lineTo(0, 10); ctx.lineTo(-5, 0); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
+      }
+      if (this.orbitalWispCooldown > 0) {
+        ctx.strokeStyle = 'rgba(103,232,249,0.35)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(0, 0, 51, 34, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+
+    // Character sprite animation: 6 columns x 4 rows.
+    // Row 0 = idle, row 1 = walk, row 2 = run, row 3 = jump/land.
+    const moving = Math.abs(this.vx) > 18;
+    const running = this.isDashing || Math.abs(this.vx) > 210 || this.isHorizontalFlightActive;
+    let spriteRow = !this.isGrounded ? 3 : running ? 2 : moving ? 1 : 0;
+    let spriteFrame = Math.floor(this.flameTimer * (spriteRow === 0 ? 5 : spriteRow === 1 ? 9 : 13)) % 6;
+    if (spriteRow === 3) {
+      spriteFrame = this.vy < 0
+        ? 1 + (Math.floor(this.flameTimer * 10) % 3)
+        : 4 + (Math.floor(this.flameTimer * 8) % 2);
+    }
+
+    // No cyan body halo: environmental illumination will come from the carried torch.
+
+    if (this.heroSprite.complete && this.heroSprite.naturalWidth > 0) {
+      const frameW = this.heroSprite.naturalWidth / 6;
+      const frameH = this.heroSprite.naturalHeight / 4;
+      ctx.drawImage(
+        this.heroSprite,
+        spriteFrame * frameW,
+        spriteRow * frameH,
+        frameW,
+        frameH,
+        -48,
+        -58,
+        96,
+        96
+      );
+    } else {
+      // Minimal fallback while the sprite sheet is loading.
+      ctx.fillStyle = '#0e7490';
+      ctx.beginPath();
+      ctx.ellipse(0, -7, 18, 29, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 5. Katana-style sword draw and three distinct cinematic cutting arcs.
+    if (!this.isStageExitReached && !this.isHorizontalFlightActive) {
+      ctx.save();
+      const progress = this.isSlashing ? Math.max(0, Math.min(1, 1 - this.slashTimer / 0.25)) : 0;
+      const bladeOffset = this.isSlashing ? 34 + Math.sin(progress * Math.PI) * 17 : 25;
+      const idleAngle = Math.sin(this.flameTimer * 2.8) * 0.09;
+      const bladeRot = !this.isSlashing ? idleAngle : this.slashDirection === 'rising'
+        ? 1.55 - progress * 3.1
+        : this.slashDirection === 'descending'
+          ? -1.55 + progress * 3.1
+          : this.activeSlashStep === 1
+            ? 1.95 - progress * 3.75
+            : this.activeSlashStep === 2 ? -2.35 + progress * 4.65 : -1.75 + progress * 3.05;
+      ctx.translate(bladeOffset, -7);
+
+      if (this.isSlashing) {
+        // Crescent trail follows the blade tip; heavy finisher gets a wider, brighter arc.
+        ctx.save();
+        ctx.rotate(bladeRot - (this.activeSlashStep === 1 ? 0.72 : -0.72));
+        ctx.strokeStyle = this.activeSlashStep === 0 ? 'rgba(125,211,252,0.72)' : 'rgba(224,242,254,0.9)';
+        ctx.lineWidth = this.activeSlashStep === 2 ? 8 : 5;
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = this.activeSlashStep === 2 ? 26 : 16;
+        ctx.beginPath();
+        const arcStart = this.slashDirection === 'rising' ? -2.05 : this.slashDirection === 'descending' ? -0.25 : -1.05;
+        const arcEnd = this.slashDirection === 'rising' ? 0.55 : this.slashDirection === 'descending' ? 2.05 : 0.78;
+        ctx.arc(0, 0, this.activeSlashStep === 2 ? 72 : 61, arcStart, arcEnd);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.rotate(bladeRot);
+      // Polished katana blade with a bright edge and dark wrapped grip.
+      ctx.shadowColor = '#7dd3fc'; ctx.shadowBlur = 20;
+      const bladeGrad = ctx.createLinearGradient(0, -58, 7, -8);
+      bladeGrad.addColorStop(0, '#ffffff'); bladeGrad.addColorStop(0.45, '#bae6fd'); bladeGrad.addColorStop(1, '#64748b');
+      ctx.fillStyle = bladeGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, -58); ctx.lineTo(7, -52); ctx.lineTo(6, -8); ctx.lineTo(1, -3); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(2, -53); ctx.lineTo(2, -10); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.fillStyle = '#172033';
+      ctx.fillRect(-7, -7, 20, 4);
+      ctx.fillStyle = '#94a3b8'; ctx.fillRect(-1, -3, 7, 15);
+      ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+      for (let wrap = 0; wrap < 3; wrap++) { ctx.beginPath(); ctx.moveTo(-1, wrap * 4); ctx.lineTo(6, wrap * 4 + 3); ctx.stroke(); }
+      ctx.restore();
+    }
+
+    // 6. Soft protective ward: a subtle luminous shell that vanishes with its timer.
+    if (this.isParrying) {
+      const pulse = 1 + Math.sin(this.flameTimer * 5) * 0.025;
+      const aura = ctx.createRadialGradient(0, 0, 20, 0, 0, 72);
+      aura.addColorStop(0, 'rgba(110,245,220,0.015)');
+      aura.addColorStop(0.68, 'rgba(110,245,220,0.09)');
+      aura.addColorStop(0.9, 'rgba(125,255,231,0.19)');
+      aura.addColorStop(1, 'rgba(125,255,231,0)');
+      ctx.fillStyle = aura; ctx.beginPath(); ctx.ellipse(0, 0, 58 * pulse, 70 * pulse, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(167,243,228,0.42)'; ctx.lineWidth = 1.5; ctx.shadowColor = '#6ee7d8'; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.ellipse(0, 0, 48 * pulse, 61 * pulse, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // Azure Flame skill aura; restrained sparks stay attached to the hero and expire quickly.
+    if (this.azureFlameTimer > 0) {
+      const pulse = 1 + Math.sin(this.flameTimer * 9) * 0.06;
+      const flameAura = ctx.createRadialGradient(0, 0, 8, 0, 0, 66);
+      flameAura.addColorStop(0, 'rgba(34,211,238,0.02)');
+      flameAura.addColorStop(0.55, 'rgba(34,211,238,0.12)');
+      flameAura.addColorStop(0.82, 'rgba(103,232,249,0.22)');
+      flameAura.addColorStop(1, 'rgba(34,211,238,0)');
+      ctx.fillStyle = flameAura; ctx.beginPath(); ctx.ellipse(0, -4, 58 * pulse, 69 * pulse, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  // ==========================================
+
+  // ==========================================
+  // MASTERPIECE LIVING FLAME ENEMY RENDERING
+  // ==========================================
   /**
    * Hand-drawn FLAME knight. Kept entirely in the existing Canvas renderer so
    * animation timing and hitboxes remain owned by the original combat engine.
