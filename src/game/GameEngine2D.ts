@@ -123,7 +123,7 @@ export class GameEngine2D {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private heroSprite: HTMLImageElement = new Image();
-  private world01Assets: Record<string, HTMLImageElement> = {};
+  private craftpixWorldAssets: Record<string, HTMLImageElement> = {};
 
   private animFrameId = 0;
   private isRunning = true;
@@ -339,32 +339,21 @@ export class GameEngine2D {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.heroSprite.src = '/assets/flame-hero-sheet.png';
-    const world01Files = [
-      '01_sky_base.png', '02_moon.png', '03_clouds_far.png', '04_clouds_near.png',
-      '05_mountains_far.png', '06_mountains_near.png', '07_royal_citadel.png',
-      '08_midground_city.png', '09_foreground_architecture.png',
-      '11_vegetation.png', '12_stone_floor.png',
-    ];
-    for (const file of world01Files) {
-      const image = new Image();
-      image.src = `/assets/world01/${file}`;
-      this.world01Assets[file] = image;
+    // Four Craftpix worlds: five stages per world. Load only the supplied transparent parallax layers.
+    const craftpixWorldFiles: Record<string, string[]> = {
+      world01: ['sky.png', 'clouds_1.png', 'clouds_2.png', 'clouds_3.png', 'clouds_4.png', 'rocks_1.png', 'rocks_2.png'],
+      world02: ['sky.png', 'clouds_1.png', 'clouds_2.png', 'clouds_3.png', 'birds.png', 'rocks_1.png', 'rocks_2.png', 'rocks_3.png', 'pines.png'],
+      world03: ['sky.png', 'clouds_1.png', 'clouds_2.png', 'rocks.png', 'ground_1.png', 'ground_2.png', 'ground_3.png', 'plant.png'],
+      world04: ['sky.png', 'clouds_1.png', 'clouds_2.png', 'rocks.png', 'ground.png'],
+    };
+    for (const [world, files] of Object.entries(craftpixWorldFiles)) {
+      for (const file of files) {
+        const image = new Image();
+        image.decoding = 'async';
+        image.src = `/assets/worlds/${world}/${file}`;
+        this.craftpixWorldAssets[`${world}/${file}`] = image;
+      }
     }
-    // Ten complete, user-supplied palm images. Each file is loaded whole; no spritesheet cropping.
-    for (let i = 1; i <= 10; i++) {
-      const file = `palm_new_${String(i).padStart(2, '0')}.png`;
-      const image = new Image();
-      image.src = `/assets/world01/palms-new/${file}`;
-      this.world01Assets[file] = image;
-    }
-    for (let i = 1; i <= 16; i++) {
-      const file = `plant_${String(i).padStart(2, '0')}.png`;
-      const image = new Image(); image.src = `/assets/world01/sprites/${file}`;
-      this.world01Assets[file] = image;
-    }
-    const plaza = new Image();
-    plaza.src = '/assets/world01/plaza.webp';
-    this.world01Assets['plaza.webp'] = plaza;
     this.settings = initialSettings;
 
     this.onResize();
@@ -1683,140 +1672,105 @@ export class GameEngine2D {
   // BREATHTAKING AAA 2D RENDERING
   // ==========================================
 
-  private drawWorld01Strip(
+  /** Select one of the four supplied Craftpix worlds; each world spans exactly five stages. */
+  private getCraftpixWorldKey(): 'world01' | 'world02' | 'world03' | 'world04' {
+    const index = Math.min(3, Math.max(0, Math.floor(this.currentStageIndex / 5)));
+    return (`world${String(index + 1).padStart(2, '0')}`) as 'world01' | 'world02' | 'world03' | 'world04';
+  }
+
+  /** Draw a full-canvas parallax layer without stretching its original 16:9 composition. */
+  private drawCraftpixLayer(
     ctx: CanvasRenderingContext2D,
+    world: string,
     file: string,
-    y: number,
-    targetHeight: number,
+    width: number,
+    height: number,
     parallax: number,
     alpha = 1,
-    anchorBottom = false,
-    fitHeight = false,
   ) {
-    const image = this.world01Assets[file];
-    if (!image || !image.complete || image.naturalWidth === 0) return;
-    const scale = fitHeight ? targetHeight / image.naturalHeight : Math.max(targetHeight / image.naturalHeight, (this.viewportWidth * 1.08) / image.naturalWidth);
+    const image = this.craftpixWorldAssets[`${world}/${file}`];
+    if (!image?.complete || image.naturalWidth === 0) return;
+    const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
     const drawWidth = image.naturalWidth * scale;
     const drawHeight = image.naturalHeight * scale;
-    const drawY = anchorBottom ? y - drawHeight : y;
-    const offset = -((this.cameraX * parallax) % drawWidth);
+    // Keep the sky stationary; move distant and near layers at restrained speeds.
+    const travel = this.cameraX * parallax;
+    const offset = -((travel % drawWidth + drawWidth) % drawWidth);
     ctx.save();
     ctx.globalAlpha = alpha;
-    for (let x = offset - drawWidth; x < this.viewportWidth + drawWidth; x += drawWidth) {
-      ctx.drawImage(image, x, drawY, drawWidth, drawHeight);
+    for (let x = offset - drawWidth; x < width + drawWidth; x += drawWidth) {
+      ctx.drawImage(image, x, (height - drawHeight) / 2, drawWidth, drawHeight);
     }
     ctx.restore();
   }
 
-  /** Draws a deterministic row of individually loaded transparent props in screen space. */
-  private drawWorld01SpriteRow(
-    ctx: CanvasRenderingContext2D,
-    prefix: 'palm-new' | 'plant',
-    count: number,
-    baseY: number,
-    spacing: number,
-    parallax: number,
-    targetHeight: number,
-    alpha = 1,
-  ) {
-    const first = Math.floor((this.cameraX * parallax) / spacing) - 1;
-    const last = first + Math.ceil(this.viewportWidth / spacing) + 3;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    for (let slot = first; slot <= last; slot++) {
-      const positive = ((slot % count) + count) % count;
-      const file = prefix === 'palm-new'
-        ? `palm_new_${String(positive + 1).padStart(2, '0')}.png`
-        : `plant_${String(positive + 1).padStart(2, '0')}.png`;
-      const image = this.world01Assets[file];
-      if (!image?.complete || image.naturalWidth === 0) continue;
-      const variation = 0.78 + (((slot * 17 + 31) % 7 + 7) % 7) * 0.075;
-      const h = targetHeight * variation;
-      const w = h * image.naturalWidth / image.naturalHeight;
-      const worldX = slot * spacing + spacing * 0.52;
-      const screenX = worldX - this.cameraX * parallax;
-      ctx.drawImage(image, screenX - w / 2, baseY - h, w, h);
-    }
-    ctx.restore();
-  }
-
-  /** World 01 is assembled from independent image layers with separate parallax speeds. */
-  private renderWorld01Backdrop(ctx: CanvasRenderingContext2D, width: number, height: number) {
-    const sky = this.world01Assets['01_sky_base.png'];
+  /** Back-to-front layer order for the four Craftpix environments. */
+  private renderCraftpixBackdrop(ctx: CanvasRenderingContext2D, width: number, height: number) {
+    const world = this.getCraftpixWorldKey();
+    const sky = this.craftpixWorldAssets[`${world}/sky.png`];
     if (sky?.complete && sky.naturalWidth > 0) {
-      // Cover without stretching the sky when the phone's landscape aspect ratio differs.
       const scale = Math.max(width / sky.naturalWidth, height / sky.naturalHeight);
-      const sw = sky.naturalWidth * scale;
-      const sh = sky.naturalHeight * scale;
-      ctx.drawImage(sky, (width - sw) / 2, (height - sh) / 2, sw, sh);
+      const dw = sky.naturalWidth * scale;
+      const dh = sky.naturalHeight * scale;
+      ctx.drawImage(sky, (width - dw) / 2, (height - dh) / 2, dw, dh);
     } else {
       const fallback = ctx.createLinearGradient(0, 0, 0, height);
-      fallback.addColorStop(0, '#07132d'); fallback.addColorStop(1, '#172b50');
-      ctx.fillStyle = fallback; ctx.fillRect(0, 0, width, height);
+      fallback.addColorStop(0, '#8fcbd5');
+      fallback.addColorStop(1, '#d9e7d9');
+      ctx.fillStyle = fallback;
+      ctx.fillRect(0, 0, width, height);
     }
 
-    // The sky image contains no celestial objects. Moon and cloud assets are independent.
-    this.drawWorld01Strip(ctx, '03_clouds_far.png', height * 0.075, height * 0.205, 0.018, 0.48);
+    const layer = (file: string, speed: number, alpha = 1) =>
+      this.drawCraftpixLayer(ctx, world, file, width, height, speed, alpha);
 
-    const moon = this.world01Assets['02_moon.png'];
-    if (moon?.complete && moon.naturalWidth > 0) {
-      const size = Math.min(height * 0.30, width * 0.21);
-      const moonX = width * 0.70 - this.cameraX * 0.012;
-      const moonY = height * 0.055;
+    if (world === 'world01') {
+      layer('clouds_1.png', 0.012, 0.95);
+      layer('clouds_2.png', 0.018, 0.92);
+      layer('clouds_3.png', 0.026, 0.88);
+      layer('clouds_4.png', 0.034, 0.82);
+      layer('rocks_1.png', 0.055);
+      layer('rocks_2.png', 0.085);
+    } else if (world === 'world02') {
+      layer('clouds_1.png', 0.012);
+      layer('clouds_2.png', 0.020);
+      layer('clouds_3.png', 0.028);
+      layer('birds.png', 0.038);
+      layer('rocks_1.png', 0.052);
+      layer('rocks_2.png', 0.072);
+      layer('rocks_3.png', 0.092);
+      layer('pines.png', 0.12);
+    } else if (world === 'world03') {
+      layer('clouds_1.png', 0.012);
+      layer('clouds_2.png', 0.022);
+      layer('rocks.png', 0.07);
+    } else {
+      layer('clouds_1.png', 0.014);
+      layer('clouds_2.png', 0.026);
+      layer('rocks.png', 0.075);
+    }
+  }
+
+  /** Keep one flat collision plane; optional supplied ground art is visual only. */
+  private renderCraftpixGround(ctx: CanvasRenderingContext2D, width: number, height: number) {
+    const world = this.getCraftpixWorldKey();
+    const groundFiles = world === 'world03'
+      ? ['ground_1.png', 'ground_2.png', 'ground_3.png']
+      : world === 'world04' ? ['ground.png'] : [];
+    if (groundFiles.length === 0) return;
+
+    // These full-canvas transparent layers are pinned to the viewport while the
+    // gameplay collision line remains the existing constant groundY.
+    for (let i = 0; i < groundFiles.length; i++) {
+      const image = this.craftpixWorldAssets[`${world}/${groundFiles[i]}`];
+      if (!image?.complete || image.naturalWidth === 0) continue;
+      const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+      const dw = image.naturalWidth * scale;
+      const dh = image.naturalHeight * scale;
       ctx.save();
-      ctx.globalAlpha = 0.98;
-      ctx.shadowColor = 'rgba(145,198,255,0.42)';
-      ctx.shadowBlur = 24;
-      ctx.drawImage(moon, moonX - size / 2, moonY, size, size * moon.naturalHeight / moon.naturalWidth);
+      ctx.globalAlpha = world === 'world03' ? 0.82 : 0.92;
+      ctx.drawImage(image, this.cameraX + (width - dw) / 2, this.cameraY + (height - dh) / 2, dw, dh);
       ctx.restore();
-    }
-
-    this.drawWorld01Strip(ctx, '04_clouds_near.png', height * 0.105, height * 0.255, 0.052, 0.36);
-  }
-
-  /** Shared Arabic city and mountain layers, positioned from the actual landscape viewport. */
-  private renderArabicCityLayers(ctx: CanvasRenderingContext2D, width: number, height: number) {
-    const horizon = Math.max(height * 0.58, Math.min(height * 0.88, this.groundY - this.cameraY));
-    this.drawWorld01Strip(ctx, '05_mountains_far.png', horizon, height * 0.43, 0.025, 1, true);
-    this.drawWorld01Strip(ctx, '06_mountains_near.png', horizon + height * 0.012, height * 0.35, 0.045, 1, true);
-
-    // Enlarge and reinforce the same approved Arabic skyline in all 20 stages.
-    this.drawWorld01Strip(ctx, '08_midground_city.png', horizon + height * 0.012, height * 0.64, 0.075, 1, true, true);
-    this.drawWorld01Strip(ctx, '08_midground_city.png', horizon + height * 0.012, height * 0.64, 0.075, 1, true, true);
-
-    const citadel = this.world01Assets['07_royal_citadel.png'];
-    if (citadel?.complete && citadel.naturalWidth > 0) {
-      const targetH = height * 0.66;
-      const scale = targetH / citadel.naturalHeight;
-      const dw = citadel.naturalWidth * scale;
-      const dh = citadel.naturalHeight * scale;
-      const x = width * 0.52 - dw / 2 - this.cameraX * 0.09;
-      ctx.drawImage(citadel, x, horizon - dh, dw, dh);
-    }
-
-    // Draw foreground facades twice for stronger opacity; palms are last so their
-    // trunks and crowns remain completely visible instead of being hidden by roofs.
-    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.38, 0.16, 1, true, true);
-    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.38, 0.16, 1, true, true);
-    // Plant the palms at the plaza edge; the plaza artwork covers their lower trunks.
-    this.drawWorld01SpriteRow(ctx, 'palm-new', 10, this.groundY - this.cameraY, 310, 0.12, height * 0.48, 1);
-  }
-
-  /** Repeats the supplied plaza artwork continuously across every stage. */
-  private renderArabicPlaza(ctx: CanvasRenderingContext2D, left: number, right: number, height: number) {
-    const image = this.world01Assets['plaza.webp'];
-    const floorY = this.groundY;
-    const bottomY = height + this.cameraY + 700;
-    ctx.fillStyle = '#292522';
-    ctx.fillRect(left, floorY, right - left, bottomY - floorY);
-    if (!image?.complete || image.naturalWidth === 0) return;
-    const scale = Math.max(1, height * 0.34 / image.naturalHeight);
-    const tileW = image.naturalWidth * scale;
-    const tileH = image.naturalHeight * scale;
-    const firstTile = Math.floor(left / tileW);
-    const lastTile = Math.ceil(right / tileW);
-    for (let tile = firstTile; tile <= lastTile; tile++) {
-      ctx.drawImage(image, tile * tileW, floorY, tileW, tileH);
     }
   }
 
@@ -1833,14 +1787,9 @@ export class GameEngine2D {
     }
 
     const palette = this.getActPalette();
-    const isDesertBiome = false;
-    const cityBiome = null;
-    const isStoneBiome = false;
 
-    // One approved Arabic world is used consistently in all 20 stages.
-    this.renderWorld01Backdrop(ctx, width, height);
-    this.renderArabicCityLayers(ctx, width, height);
-    // Preserve ravens as smaller flocks over the unified Arabic sky.
+    // One Craftpix environment is selected for each consecutive group of five stages.
+    this.renderCraftpixBackdrop(ctx, width, height);
     this.renderCrows(ctx);
 
     // Transform for World Coordinates with CINEMATIC CAMERA ZOOM
@@ -1859,33 +1808,39 @@ export class GameEngine2D {
     const groundRight = this.cameraX + width / this.cameraZoom + 600;
     const groundWidth = groundRight - groundLeft;
 
-    // 5. ARABIC WORLD GROUND: a single continuous playable surface.: deep green-black grassland with readable rolling contours.
+    // 5. One continuous, perfectly flat gameplay surface shared by all stages.
     ctx.beginPath();
-    for (let wx = groundLeft; wx <= groundRight; wx += 10) {
-      const gy = this.terrainHeightAt(wx);
-      if (wx === groundLeft) ctx.moveTo(wx, gy); else ctx.lineTo(wx, gy);
-    }
+    ctx.moveTo(groundLeft, this.groundY);
+    ctx.lineTo(groundRight, this.groundY);
     ctx.lineTo(groundRight, height + this.cameraY + 1000);
     ctx.lineTo(groundLeft, height + this.cameraY + 1000);
     ctx.closePath();
-    const isRoseMeadow = false;
-    const isDesert = false;
-    const meadow = ctx.createLinearGradient(0, this.groundY - 65, 0, this.groundY + 420);
-    if (isDesert) {
-      meadow.addColorStop(0, '#d6a85e'); meadow.addColorStop(0.10, '#9b6a36'); meadow.addColorStop(0.42, '#5a3822'); meadow.addColorStop(1, '#1c120d');
-    } else if (isStoneBiome) {
-      meadow.addColorStop(0, '#777b7e'); meadow.addColorStop(0.10, '#4c5158'); meadow.addColorStop(0.38, '#252b34'); meadow.addColorStop(1, '#0b0e13');
-    } else if (isRoseMeadow) {
-      meadow.addColorStop(0, '#8f527e'); meadow.addColorStop(0.10, '#60334f'); meadow.addColorStop(0.38, '#321c32'); meadow.addColorStop(1, '#100b18');
-    } else if (this.currentStageIndex === 0) {
-      meadow.addColorStop(0, '#333b43'); meadow.addColorStop(0.10, '#202830'); meadow.addColorStop(0.38, '#111820'); meadow.addColorStop(1, '#070b10');
+    const groundGradient = ctx.createLinearGradient(0, this.groundY - 18, 0, this.groundY + 460);
+    const activeWorld = this.getCraftpixWorldKey();
+    if (activeWorld === 'world01') {
+      groundGradient.addColorStop(0, '#668b72');
+      groundGradient.addColorStop(0.12, '#3e654c');
+      groundGradient.addColorStop(0.48, '#203b30');
+      groundGradient.addColorStop(1, '#101e1a');
+    } else if (activeWorld === 'world02') {
+      groundGradient.addColorStop(0, '#597b55');
+      groundGradient.addColorStop(0.12, '#38563c');
+      groundGradient.addColorStop(0.48, '#203528');
+      groundGradient.addColorStop(1, '#101c17');
+    } else if (activeWorld === 'world03') {
+      groundGradient.addColorStop(0, '#435d43');
+      groundGradient.addColorStop(0.12, '#2c442f');
+      groundGradient.addColorStop(0.48, '#18291e');
+      groundGradient.addColorStop(1, '#0a130e');
     } else {
-      meadow.addColorStop(0, '#263d2c'); meadow.addColorStop(0.10, '#172b20'); meadow.addColorStop(0.38, '#0c1b14'); meadow.addColorStop(1, '#030906');
+      groundGradient.addColorStop(0, '#536b70');
+      groundGradient.addColorStop(0.12, '#344d54');
+      groundGradient.addColorStop(0.48, '#1c3038');
+      groundGradient.addColorStop(1, '#0b171d');
     }
-    ctx.fillStyle = meadow; ctx.fill();
-
-    // Replace all former biome ground decorations with the single supplied plaza.
-    this.renderArabicPlaza(ctx, groundLeft, groundRight, height);
+    ctx.fillStyle = groundGradient;
+    ctx.fill();
+    this.renderCraftpixGround(ctx, width, height);
 
     // Elevated monolith platforms and their visual surfaces are removed.
 
