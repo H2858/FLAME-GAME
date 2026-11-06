@@ -214,7 +214,7 @@ export class GameEngine2D {
 
   // Distant ravens crossing the moon at irregular intervals.
   private crows: Array<{ x: number; y: number; speed: number; scale: number; phase: number; direction: 1 | -1 }> = [];
-  private crowSpawnTimer = 5 + Math.random() * 4;
+  private crowSpawnTimer = 3 + Math.random() * 2;
   private lastThunderCycle = -1;
   private lastAircraftPassCycle = -1;
 
@@ -474,20 +474,8 @@ export class GameEngine2D {
    * Wolf eyes lowered near ground level in the low dark mist (NOT in the sky!)
    */
   private setupLowMistyEyes() {
+    // Legacy glowing eyes are disabled in the approved Arabic world.
     this.lowEyes = [];
-    for (let i = 0; i < 28; i++) {
-      this.lowEyes.push({
-        id: i,
-        normX: 300 + i * 260 + Math.random() * 80,
-        yOffset: 30 + (i % 3) * 22, // 30 to 74 px above ground, in the low mist!
-        size: 2.0,
-        gap: 11 + (i % 3) * 2,
-        state: 'dormant',
-        alpha: 0,
-        timer: 0,
-        waitTimer: 2.0 + Math.random() * 6,
-      });
-    }
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
@@ -1832,16 +1820,16 @@ export class GameEngine2D {
   /** Shared Arabic city and mountain layers, positioned from the actual landscape viewport. */
   private renderArabicCityLayers(ctx: CanvasRenderingContext2D, width: number, height: number) {
     const horizon = Math.max(height * 0.58, Math.min(height * 0.88, this.groundY - this.cameraY));
-    // Distant mountains first; the horizon is viewport-relative, never the 530px world floor.
-    this.drawWorld01Strip(ctx, '05_mountains_far.png', horizon, height * 0.40, 0.025, 0.98, true);
-    this.drawWorld01Strip(ctx, '06_mountains_near.png', horizon + height * 0.015, height * 0.31, 0.045, 1, true);
+    this.drawWorld01Strip(ctx, '05_mountains_far.png', horizon, height * 0.43, 0.025, 1, true);
+    this.drawWorld01Strip(ctx, '06_mountains_near.png', horizon + height * 0.012, height * 0.35, 0.045, 1, true);
 
-    // The same Arabic skyline is used behind every one of the 20 stages.
-    this.drawWorld01Strip(ctx, '08_midground_city.png', horizon + height * 0.012, height * 0.56, 0.075, 1, true, true);
+    // Enlarge and reinforce the same approved Arabic skyline in all 20 stages.
+    this.drawWorld01Strip(ctx, '08_midground_city.png', horizon + height * 0.012, height * 0.64, 0.075, 1, true, true);
+    this.drawWorld01Strip(ctx, '08_midground_city.png', horizon + height * 0.012, height * 0.64, 0.075, 1, true, true);
 
     const citadel = this.world01Assets['07_royal_citadel.png'];
     if (citadel?.complete && citadel.naturalWidth > 0) {
-      const targetH = height * 0.58;
+      const targetH = height * 0.66;
       const scale = targetH / citadel.naturalHeight;
       const dw = citadel.naturalWidth * scale;
       const dh = citadel.naturalHeight * scale;
@@ -1849,8 +1837,52 @@ export class GameEngine2D {
       ctx.drawImage(citadel, x, horizon - dh, dw, dh);
     }
 
-    this.drawWorld01SpriteRow(ctx, 'palm', 12, horizon + height * 0.055, 360, 0.12, height * 0.44, 1);
-    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.34, 0.16, 1, true, true);
+    // Draw foreground facades twice for stronger opacity; palms are last so their
+    // trunks and crowns remain completely visible instead of being hidden by roofs.
+    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.38, 0.16, 1, true, true);
+    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.38, 0.16, 1, true, true);
+    this.drawWorld01SpriteRow(ctx, 'palm', 12, horizon + height * 0.075, 310, 0.12, height * 0.52, 1);
+  }
+
+  /** Continuous stone plaza between the fixed Arabic city and the rolling playfield. */
+  private renderArabicPlaza(ctx: CanvasRenderingContext2D, left: number, right: number, height: number) {
+    const horizon = Math.max(height * 0.58, Math.min(height * 0.88, this.groundY - this.cameraY));
+    const topY = horizon + this.cameraY + height * 0.020;
+    const step = 10;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(left, topY);
+    ctx.lineTo(right, topY);
+    for (let wx = right; wx >= left; wx -= step) ctx.lineTo(wx, this.terrainHeightAt(wx));
+    ctx.closePath();
+    ctx.clip();
+
+    const stone = ctx.createLinearGradient(0, topY, 0, this.groundY + 190);
+    stone.addColorStop(0, '#5c5145');
+    stone.addColorStop(0.18, '#51483e');
+    stone.addColorStop(0.62, '#3d3934');
+    stone.addColorStop(1, '#292b2b');
+    ctx.fillStyle = stone;
+    ctx.fillRect(left, topY, right - left, height + this.cameraY + this.groundY + 260);
+
+    // Staggered paving joints and subtle bevel highlights give the plaza a solid surface.
+    for (let row = 0; row < 12; row++) {
+      const y = topY + 13 + row * 22;
+      ctx.strokeStyle = row % 2 === 0 ? 'rgba(224,197,151,0.15)' : 'rgba(12,16,18,0.24)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+      const tile = 86;
+      const offset = (row % 2) * tile * 0.5;
+      for (let x = Math.floor(left / tile) * tile - tile + offset; x < right + tile; x += tile) {
+        ctx.strokeStyle = 'rgba(12,16,18,0.20)';
+        ctx.beginPath(); ctx.moveTo(x, y - 21); ctx.lineTo(x, y); ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = 'rgba(230,197,143,0.58)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(left, topY + 1); ctx.lineTo(right, topY + 1); ctx.stroke();
+    ctx.restore();
   }
 
   private render() {
@@ -1916,6 +1948,9 @@ export class GameEngine2D {
       meadow.addColorStop(0, '#263d2c'); meadow.addColorStop(0.10, '#172b20'); meadow.addColorStop(0.38, '#0c1b14'); meadow.addColorStop(1, '#030906');
     }
     ctx.fillStyle = meadow; ctx.fill();
+
+    // Cover the entire space beneath the city with one opaque plaza surface.
+    this.renderArabicPlaza(ctx, groundLeft, groundRight, height);
 
     // Soft moonlit grassy ridge and fine blades along the silhouette.
     ctx.save();
@@ -2042,19 +2077,8 @@ export class GameEngine2D {
       ctx.fillStyle = isRoseMeadow ? `rgba(255,190,226,${0.15 + (i % 3) * 0.05})` : `rgba(139,190,126,${0.12 + (i % 3) * 0.05})`;
       ctx.beginPath(); ctx.arc(wx, gy, 1 + (i % 2), 0, Math.PI * 2); ctx.fill();
     }
-    // The approved Arabic stone floor is tiled in every stage and follows the
-    // existing terrain profile without changing collision geometry.
-    const floor = this.world01Assets['12_stone_floor.png'];
-    if (floor?.complete && floor.naturalWidth > 0) {
-      const targetH = 76;
-      const scale = targetH / floor.naturalHeight;
-      const tileW = floor.naturalWidth * scale;
-      const startX = Math.floor(groundLeft / tileW) * tileW - tileW;
-      for (let x = startX; x < groundRight + tileW; x += tileW) {
-        const floorY = this.terrainHeightAt(x + tileW * 0.5);
-        ctx.drawImage(floor, x, floorY - targetH * 0.13, tileW, targetH);
-      }
-    }
+    // The continuous plaza replaces the oversized terrain-following floor tiles,
+    // which previously created visible seams and overlaps.
     ctx.restore();
 
     // 6. FLOATING MONOLITHS WITH LUMINOUS NEON STRIPS
@@ -2488,19 +2512,19 @@ export class GameEngine2D {
     this.crowSpawnTimer -= dt;
     if (this.crowSpawnTimer <= 0) {
       const direction: 1 | -1 = Math.random() > 0.5 ? 1 : -1;
-      const flockSize = 2 + Math.floor(Math.random() * 2);
+      const flockSize = 4 + Math.floor(Math.random() * 3);
       for (let bird = 0; bird < flockSize; bird++) {
         this.crows.push({
-          x: (direction === 1 ? -55 : this.viewportWidth + 55) - direction * bird * (22 + Math.random() * 18),
-          y: 75 + Math.random() * 145 + bird * (8 + Math.random() * 10),
-          speed: 78 + Math.random() * 52,
-          scale: 0.24 + Math.random() * 0.12,
+          x: (direction === 1 ? -55 : this.viewportWidth + 55) - direction * bird * (16 + Math.random() * 12),
+          y: 55 + Math.random() * 125 + bird * (6 + Math.random() * 8),
+          speed: 68 + Math.random() * 46,
+          scale: 0.15 + Math.random() * 0.07,
           phase: Math.random() * Math.PI * 2,
           direction,
         });
       }
       if (Math.random() < 0.42) soundManager.playCrowCall();
-      this.crowSpawnTimer = 5 + Math.random() * 4;
+      this.crowSpawnTimer = 3 + Math.random() * 2;
     }
     for (const crow of this.crows) {
       crow.x += crow.speed * crow.direction * dt;
