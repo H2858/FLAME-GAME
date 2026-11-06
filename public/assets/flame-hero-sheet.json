@@ -1,0 +1,17 @@
+{
+  "character": "FLAME hooded hero",
+  "sprite_sheet": "public/assets/flame-hero-sheet.png",
+  "grid": {
+    "columns": 6,
+    "rows": 4,
+    "frame_width": 256,
+    "frame_height": 256
+  },
+  "animation_rows": {
+    "idle": 0,
+    "walk": 1,
+    "run": 2,
+    "jump_land": 3
+  },
+  "note": "Generated concept sprite sheet; verify frame alignment and build on target device."
+}
