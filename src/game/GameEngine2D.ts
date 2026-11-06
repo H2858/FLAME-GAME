@@ -2066,6 +2066,8 @@ export class GameEngine2D {
       meadow.addColorStop(0, '#777b7e'); meadow.addColorStop(0.10, '#4c5158'); meadow.addColorStop(0.38, '#252b34'); meadow.addColorStop(1, '#0b0e13');
     } else if (isRoseMeadow) {
       meadow.addColorStop(0, '#8f527e'); meadow.addColorStop(0.10, '#60334f'); meadow.addColorStop(0.38, '#321c32'); meadow.addColorStop(1, '#100b18');
+    } else if (this.currentStageIndex === 0) {
+      meadow.addColorStop(0, '#333b43'); meadow.addColorStop(0.10, '#202830'); meadow.addColorStop(0.38, '#111820'); meadow.addColorStop(1, '#070b10');
     } else {
       meadow.addColorStop(0, '#263d2c'); meadow.addColorStop(0.10, '#172b20'); meadow.addColorStop(0.38, '#0c1b14'); meadow.addColorStop(1, '#030906');
     }
@@ -2190,7 +2192,7 @@ export class GameEngine2D {
       }
     }
     // Sparse dew glints, subdued so the playfield stays clear.
-    for (let i = 0; !isDesert && i < 24; i++) {
+    for (let i = 0; !isDesert && this.currentStageIndex !== 0 && i < 24; i++) {
       const wx = groundLeft + ((i * 137 + 31) % Math.max(1, groundWidth));
       const gy = this.terrainHeightAt(wx) + 8 + (i % 5) * 11;
       ctx.fillStyle = isRoseMeadow ? `rgba(255,190,226,${0.15 + (i % 3) * 0.05})` : `rgba(139,190,126,${0.12 + (i % 3) * 0.05})`;
