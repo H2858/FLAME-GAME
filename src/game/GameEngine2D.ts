@@ -214,7 +214,7 @@ export class GameEngine2D {
 
   // Distant ravens crossing the moon at irregular intervals.
   private crows: Array<{ x: number; y: number; speed: number; scale: number; phase: number; direction: 1 | -1 }> = [];
-  private crowSpawnTimer = 14 + Math.random() * 12;
+  private crowSpawnTimer = 5 + Math.random() * 4;
   private lastThunderCycle = -1;
   private lastAircraftPassCycle = -1;
 
@@ -1837,11 +1837,11 @@ export class GameEngine2D {
     this.drawWorld01Strip(ctx, '06_mountains_near.png', horizon + height * 0.015, height * 0.31, 0.045, 1, true);
 
     // The same Arabic skyline is used behind every one of the 20 stages.
-    this.drawWorld01Strip(ctx, '08_midground_city.png', horizon + height * 0.012, height * 0.43, 0.075, 1, true, true);
+    this.drawWorld01Strip(ctx, '08_midground_city.png', horizon + height * 0.012, height * 0.56, 0.075, 1, true, true);
 
     const citadel = this.world01Assets['07_royal_citadel.png'];
     if (citadel?.complete && citadel.naturalWidth > 0) {
-      const targetH = height * 0.47;
+      const targetH = height * 0.58;
       const scale = targetH / citadel.naturalHeight;
       const dw = citadel.naturalWidth * scale;
       const dh = citadel.naturalHeight * scale;
@@ -1849,8 +1849,8 @@ export class GameEngine2D {
       ctx.drawImage(citadel, x, horizon - dh, dw, dh);
     }
 
-    this.drawWorld01SpriteRow(ctx, 'palm', 12, horizon + 2, 520, 0.12, height * 0.34, 0.92);
-    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.29, 0.16, 0.88, true, true);
+    this.drawWorld01SpriteRow(ctx, 'palm', 12, horizon + height * 0.055, 360, 0.12, height * 0.44, 1);
+    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.34, 0.16, 1, true, true);
   }
 
   private render() {
@@ -1866,159 +1866,15 @@ export class GameEngine2D {
     }
 
     const palette = this.getActPalette();
-    const isDesertBiome = [2, 6, 12, 17].includes(this.currentStageIndex);
-    const cityBiome = this.getCityBiome();
-    const isStoneBiome = [9, 18].includes(this.currentStageIndex);
+    const isDesertBiome = false;
+    const cityBiome = null;
+    const isStoneBiome = false;
 
-    if (this.currentStageIndex === 0) {
-      this.renderWorld01Backdrop(ctx, width, height);
-    } else {
-    // 1. Deep Cosmic Night Sky (NO TREES)
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
-    if (cityBiome === 'miami') {
-      skyGrad.addColorStop(0, '#211b50'); skyGrad.addColorStop(0.34, '#78406f');
-      skyGrad.addColorStop(0.68, '#e27aa7'); skyGrad.addColorStop(1, '#39213e');
-    } else if (isDesertBiome) {
-      skyGrad.addColorStop(0, '#34243a'); skyGrad.addColorStop(0.34, '#a94f3e');
-      skyGrad.addColorStop(0.68, '#f08a45'); skyGrad.addColorStop(1, '#5a3028');
-    } else {
-      skyGrad.addColorStop(0, palette.top); skyGrad.addColorStop(0.42, palette.mid);
-      skyGrad.addColorStop(0.78, palette.low); skyGrad.addColorStop(1, '#05060c');
-    }
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, width, height);
-
-    // Glowing Stars & Twinkles
-    ctx.fillStyle = '#ffffff';
-    for (let s = 0; !isDesertBiome && s < 45; s++) {
-      const sx = (s * 137.5) % width;
-      const sy = (s * 73.1) % (height * 0.55);
-      const sRadius = s % 3 === 0 ? 1.5 : 1.0;
-      ctx.globalAlpha = 0.35 + Math.sin(this.flameTimer * 3 + s) * 0.25;
-      ctx.beginPath();
-      ctx.arc(sx, sy, sRadius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1.0;
-
-    // Layered distant nebulae on selected stages, kept behind the moon and silhouettes.
-    if ([1, 10, 15, 19].includes(this.currentStageIndex)) {
-      ctx.save(); ctx.globalCompositeOperation = 'screen';
-      const nebulae = [
-        { x: width * 0.22, y: height * 0.23, r: width * 0.34, c: 'rgba(91,75,190,0.16)' },
-        { x: width * 0.56, y: height * 0.31, r: width * 0.30, c: 'rgba(30,145,180,0.13)' },
-        { x: width * 0.82, y: height * 0.18, r: width * 0.24, c: 'rgba(180,70,140,0.10)' },
-      ];
-      for (const cloud of nebulae) {
-        const g = ctx.createRadialGradient(cloud.x, cloud.y, 0, cloud.x, cloud.y, cloud.r);
-        g.addColorStop(0, cloud.c); g.addColorStop(0.48, cloud.c.replace(/0\.1[036]/, '0.045')); g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cloud.x, cloud.y, cloud.r, cloud.r * 0.38, -0.18, 0, Math.PI * 2); ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    if (!isDesertBiome) {
-    // Giant Luminous Moon with Soft Aura
-    const moonX = width * 0.78 - this.cameraX * 0.02;
-    const moonY = 140 - this.cameraY * 0.02;
-    const moonR = 95;
-
-    const moonGlow = ctx.createRadialGradient(moonX, moonY, moonR * 0.3, moonX, moonY, moonR * 2.4);
-    moonGlow.addColorStop(0, palette.haze);
-    moonGlow.addColorStop(0.45, 'rgba(14, 165, 233, 0.08)');
-    moonGlow.addColorStop(1, 'rgba(1, 2, 6, 0)');
-    ctx.fillStyle = moonGlow;
-    ctx.beginPath();
-    ctx.arc(moonX, moonY, moonR * 2.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Atmospheric bloom blends the lunar rim into the surrounding night haze.
-    const rimHaze = ctx.createRadialGradient(moonX, moonY, moonR * 0.82, moonX, moonY, moonR * 1.28);
-    rimHaze.addColorStop(0, 'rgba(220,239,255,0.12)'); rimHaze.addColorStop(0.55, 'rgba(180,215,245,0.07)'); rimHaze.addColorStop(1, 'rgba(180,215,245,0)');
-    ctx.fillStyle = rimHaze; ctx.beginPath(); ctx.arc(moonX, moonY, moonR * 1.28, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = palette.moon;
-    ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2); ctx.fill();
-    // Visible crater basins and terminator shading make the moon read as a world, not a flat disc.
-    ctx.save(); ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2); ctx.clip();
-    const craterData = [[-.38,-.24,18],[.25,-.42,12],[.48,.12,23],[-.12,.35,27],[-.58,.42,10],[.05,-.02,8]];
-    for (const [cx, cy, r] of craterData) {
-      ctx.fillStyle = 'rgba(40,58,76,.16)'; ctx.beginPath(); ctx.arc(moonX + cx * moonR, moonY + cy * moonR, r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(moonX + cx * moonR - 2, moonY + cy * moonR - 2, r * .82, Math.PI * 1.05, Math.PI * 1.9); ctx.stroke();
-    }
-    const shade = ctx.createLinearGradient(moonX - moonR, moonY, moonX + moonR, moonY);
-    shade.addColorStop(0, 'rgba(2,8,20,.02)'); shade.addColorStop(.68, 'rgba(2,8,20,.02)'); shade.addColorStop(1, 'rgba(2,8,20,.42)');
-    ctx.fillStyle = shade; ctx.fillRect(moonX-moonR, moonY-moonR, moonR*2, moonR*2); ctx.restore();
-
-    } else {
-      this.renderDesertSunrise(ctx, width, height);
-    }
-
-    if (!isDesertBiome) {
-    // Cinematic aurora curtains on selected chapters (4, 9, 14, 19).
-    if ([3, 8, 13, 18].includes(this.currentStageIndex)) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      const auroraPhase = this.flameTimer * 0.34 + this.currentStageIndex * 0.7;
-      // Broad translucent curtains with drifting folds, layered color and a soft luminous crown.
-      for (let curtain = 0; curtain < 7; curtain++) {
-        const x0 = -width * 0.18 + curtain * width * 0.205;
-        const sway = Math.sin(auroraPhase + curtain * 0.83) * width * 0.045;
-        const top = height * (0.095 + (curtain % 3) * 0.025);
-        const bottom = height * (0.47 + (curtain % 2) * 0.045);
-        const hue = curtain % 3 === 0 ? [65, 245, 190] : curtain % 3 === 1 ? [75, 190, 255] : [165, 115, 255];
-        const gradient = ctx.createLinearGradient(x0, top, x0 + sway, bottom);
-        gradient.addColorStop(0, `rgba(${hue[0]},${hue[1]},${hue[2]},0)`);
-        gradient.addColorStop(0.18, `rgba(${hue[0]},${hue[1]},${hue[2]},0.025)`);
-        gradient.addColorStop(0.52, `rgba(${hue[0]},${hue[1]},${hue[2]},0.15)`);
-        gradient.addColorStop(0.82, `rgba(${hue[0]},${hue[1]},${hue[2]},0.055)`);
-        gradient.addColorStop(1, `rgba(${hue[0]},${hue[1]},${hue[2]},0)`);
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.moveTo(x0 - 80, top);
-        for (let y = top; y <= bottom; y += 18) {
-          const t = (y - top) / Math.max(1, bottom - top);
-          const fold = Math.sin(y * 0.012 + auroraPhase * 1.5 + curtain) * (18 + 28 * t)
-            + Math.sin(y * 0.026 - auroraPhase + curtain * 0.7) * 9;
-          ctx.lineTo(x0 + sway * t + fold - 80, y);
-        }
-        ctx.lineTo(x0 + sway + 100, bottom);
-        for (let y = bottom; y >= top; y -= 18) {
-          const t = (y - top) / Math.max(1, bottom - top);
-          const fold = Math.sin(y * 0.012 + auroraPhase * 1.5 + curtain) * (18 + 28 * t)
-            + Math.sin(y * 0.026 - auroraPhase + curtain * 0.7) * 9;
-          ctx.lineTo(x0 + sway * t + fold + 100, y);
-        }
-        ctx.closePath();
-        ctx.fill();
-      }
-      // Fine luminous wave crests give the curtains a silk-like, flowing edge.
-      for (let ribbon = 0; ribbon < 3; ribbon++) {
-        ctx.beginPath();
-        for (let x = -40; x <= width + 40; x += 12) {
-          const y = height * (0.20 + ribbon * 0.055)
-            + Math.sin(x * 0.004 + auroraPhase * (1 + ribbon * 0.12)) * (20 + ribbon * 8)
-            + Math.sin(x * 0.011 - auroraPhase * 0.8) * 9;
-          if (x === -40) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = ribbon === 0 ? 'rgba(184,255,236,0.20)' : ribbon === 1 ? 'rgba(126,220,255,0.13)' : 'rgba(206,168,255,0.10)';
-        ctx.lineWidth = ribbon === 0 ? 2.2 : 1.4;
-        ctx.shadowColor = ribbon === 0 ? '#a7fff0' : '#7dd3fc';
-        ctx.shadowBlur = 20;
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    // 2. CELESTIAL METEORS & SHOOTING STARS (نيازك وشهب تمر في السماء)
-    this.renderMeteors(ctx);
-    // Ravens are rendered in screen space so they visibly cross in front of the moon.
-    this.renderCrows(ctx);
-
-    // Procedural city silhouettes are intentionally disabled: use the approved Arabic assets.
-    }
-    }
-
+    // One approved Arabic world is used consistently in all 20 stages.
+    this.renderWorld01Backdrop(ctx, width, height);
     this.renderArabicCityLayers(ctx, width, height);
+
+
 
     // Transform for World Coordinates with CINEMATIC CAMERA ZOOM
     ctx.save();
@@ -2030,26 +1886,13 @@ export class GameEngine2D {
     ctx.translate(offsetX, offsetY);
 
     // 4. LOW MISTY PREDATOR EYES (Lowered near ground, NOT in the sky!)
-    if (!isDesertBiome) this.renderLowMistyEyes(ctx);
+    // Legacy glowing eyes are intentionally disabled for the Arabic world.
 
     const groundLeft = this.cameraX - 600;
     const groundRight = this.cameraX + width / this.cameraZoom + 600;
     const groundWidth = groundRight - groundLeft;
 
-    if (this.currentStageIndex === 15) {
-      // Miami's wet art-deco boulevard catches pink and cyan skyline reflections.
-      const roadY=this.groundY+8; const road=ctx.createLinearGradient(0,roadY,0,roadY+170);
-      road.addColorStop(0,'#32243e');road.addColorStop(.45,'#191c36');road.addColorStop(1,'#080e20');
-      ctx.fillStyle=road;ctx.fillRect(groundLeft,roadY,groundWidth,190);
-      for(let stripe=0;stripe<18;stripe++){
-        const sx=groundLeft+((stripe*173-this.cameraX*.7)%(groundWidth+173));
-        ctx.strokeStyle=stripe%2?'rgba(255,105,190,.25)':'rgba(65,225,255,.23)';ctx.lineWidth=2+(stripe%3);
-        ctx.beginPath();ctx.moveTo(sx,roadY+12);ctx.lineTo(sx+34,roadY+95+(stripe%4)*13);ctx.stroke();
-      }
-      ctx.strokeStyle='rgba(255,214,235,.42)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(groundLeft,roadY+4);ctx.lineTo(groundRight,roadY+4);ctx.stroke();
-    }
-
-    // 5. NIGHT MEADOW: deep green-black grassland with readable rolling contours.
+    // 5. ARABIC WORLD GROUND: a single continuous playable surface.: deep green-black grassland with readable rolling contours.
     ctx.beginPath();
     for (let wx = groundLeft; wx <= groundRight; wx += 10) {
       const gy = this.terrainHeightAt(wx);
@@ -2058,8 +1901,8 @@ export class GameEngine2D {
     ctx.lineTo(groundRight, height + this.cameraY + 1000);
     ctx.lineTo(groundLeft, height + this.cameraY + 1000);
     ctx.closePath();
-    const isRoseMeadow = this.currentStageIndex === 11;
-    const isDesert = isDesertBiome;
+    const isRoseMeadow = false;
+    const isDesert = false;
     const meadow = ctx.createLinearGradient(0, this.groundY - 65, 0, this.groundY + 420);
     if (isDesert) {
       meadow.addColorStop(0, '#d6a85e'); meadow.addColorStop(0.10, '#9b6a36'); meadow.addColorStop(0.42, '#5a3822'); meadow.addColorStop(1, '#1c120d');
@@ -2199,16 +2042,17 @@ export class GameEngine2D {
       ctx.fillStyle = isRoseMeadow ? `rgba(255,190,226,${0.15 + (i % 3) * 0.05})` : `rgba(139,190,126,${0.12 + (i % 3) * 0.05})`;
       ctx.beginPath(); ctx.arc(wx, gy, 1 + (i % 2), 0, Math.PI * 2); ctx.fill();
     }
-    if (this.currentStageIndex === 0) {
-      const floor = this.world01Assets['12_stone_floor.png'];
-      if (floor?.complete && floor.naturalWidth > 0) {
-        const targetH = 76;
-        const scale = targetH / floor.naturalHeight;
-        const tileW = floor.naturalWidth * scale;
-        const startX = groundLeft - (groundLeft % tileW) - tileW;
-        for (let x = startX; x < groundRight + tileW; x += tileW) {
-          ctx.drawImage(floor, x, this.groundY - targetH * 0.13, tileW, targetH);
-        }
+    // The approved Arabic stone floor is tiled in every stage and follows the
+    // existing terrain profile without changing collision geometry.
+    const floor = this.world01Assets['12_stone_floor.png'];
+    if (floor?.complete && floor.naturalWidth > 0) {
+      const targetH = 76;
+      const scale = targetH / floor.naturalHeight;
+      const tileW = floor.naturalWidth * scale;
+      const startX = Math.floor(groundLeft / tileW) * tileW - tileW;
+      for (let x = startX; x < groundRight + tileW; x += tileW) {
+        const floorY = this.terrainHeightAt(x + tileW * 0.5);
+        ctx.drawImage(floor, x, floorY - targetH * 0.13, tileW, targetH);
       }
     }
     ctx.restore();
@@ -2585,7 +2429,7 @@ export class GameEngine2D {
     const desert = [2, 6, 12, 17].includes(this.currentStageIndex);
     ctx.save();
     // World 01 already has dedicated transparent cloud layers; avoid painting a second synthetic sky.
-    if (this.currentStageIndex !== 0) for (let cloud = 0; cloud < 6; cloud++) {
+    if (false) for (let cloud = 0; cloud < 6; cloud++) {
       const cx = ((cloud * 257 + this.flameTimer * (5 + cloud * 1.7)) % (width + 420)) - 210;
       const cy = 58 + cloud * 39;
       ctx.fillStyle = `rgba(80,103,129,${storm ? 0.105 : 0.045})`;
@@ -2644,16 +2488,19 @@ export class GameEngine2D {
     this.crowSpawnTimer -= dt;
     if (this.crowSpawnTimer <= 0) {
       const direction: 1 | -1 = Math.random() > 0.5 ? 1 : -1;
-      this.crows.push({
-        x: direction === 1 ? -55 : this.viewportWidth + 55,
-        y: 75 + Math.random() * 145,
-        speed: 72 + Math.random() * 58,
-        scale: 0.55 + Math.random() * 0.65,
-        phase: Math.random() * Math.PI * 2,
-        direction,
-      });
+      const flockSize = 2 + Math.floor(Math.random() * 2);
+      for (let bird = 0; bird < flockSize; bird++) {
+        this.crows.push({
+          x: (direction === 1 ? -55 : this.viewportWidth + 55) - direction * bird * (22 + Math.random() * 18),
+          y: 75 + Math.random() * 145 + bird * (8 + Math.random() * 10),
+          speed: 78 + Math.random() * 52,
+          scale: 0.24 + Math.random() * 0.12,
+          phase: Math.random() * Math.PI * 2,
+          direction,
+        });
+      }
       if (Math.random() < 0.42) soundManager.playCrowCall();
-      this.crowSpawnTimer = 16 + Math.random() * 14;
+      this.crowSpawnTimer = 5 + Math.random() * 4;
     }
     for (const crow of this.crows) {
       crow.x += crow.speed * crow.direction * dt;
