@@ -1830,24 +1830,31 @@ export class GameEngine2D {
     this.drawWorld01Strip(ctx, '05_mountains_far.png', this.groundY - height * 0.12, height * 0.43, 0.035, 0.96, true);
     this.drawWorld01Strip(ctx, '06_mountains_near.png', this.groundY - height * 0.055, height * 0.34, 0.075, 1, true);
 
-    // Distant city skyline, then the single dominant royal citadel landmark.
-    this.drawWorld01Strip(ctx, '08_midground_city.png', this.groundY + height * 0.025, height * 0.40, 0.115, 0.94, true, true);
+  }
+
+  /** Shared Arabic city and mountain layers, positioned from the actual landscape viewport. */
+  private renderArabicCityLayers(ctx: CanvasRenderingContext2D, width: number, height: number) {
+    const horizon = height * 0.835;
+    // Distant mountains first; the horizon is viewport-relative, never the 530px world floor.
+    this.drawWorld01Strip(ctx, '05_mountains_far.png', horizon, height * 0.40, 0.025, 0.98, true);
+    this.drawWorld01Strip(ctx, '06_mountains_near.png', horizon + height * 0.015, height * 0.31, 0.045, 1, true);
+
+    // The same Arabic skyline is used behind every one of the 20 stages.
+    this.drawWorld01Strip(ctx, '08_midground_city.png', horizon + height * 0.012, height * 0.43, 0.075, 1, true, true);
+
     const citadel = this.world01Assets['07_royal_citadel.png'];
     if (citadel?.complete && citadel.naturalWidth > 0) {
-      const targetH = height * 0.43;
+      const targetH = height * 0.47;
       const scale = targetH / citadel.naturalHeight;
       const dw = citadel.naturalWidth * scale;
       const dh = citadel.naturalHeight * scale;
-      const x = width * 0.52 - dw / 2 - this.cameraX * 0.14;
-      ctx.drawImage(citadel, x, this.groundY - dh + height * 0.02, dw, dh);
+      const x = width * 0.52 - dw / 2 - this.cameraX * 0.09;
+      ctx.drawImage(citadel, x, horizon - dh, dw, dh);
     }
 
-    // Palm silhouettes are real separate sprites, not a flattened sprite-sheet rectangle.
-    this.drawWorld01SpriteRow(ctx, 'palm', 12, this.groundY + 3, 520, 0.22, height * 0.39, 0.96);
-
-    // Near market facade and scattered vegetation sit behind the independent stone floor.
-    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', this.groundY + height * 0.02, height * 0.34, 0.31, 0.90, true, true);
-    this.drawWorld01SpriteRow(ctx, 'plant', 16, this.groundY + 4, 245, 0.34, height * 0.095, 0.92);
+    this.drawWorld01SpriteRow(ctx, 'palm', 12, horizon + 2, 520, 0.12, height * 0.34, 0.92);
+    this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.29, 0.16, 0.88, true, true);
+  }
   }
 
   private render() {
@@ -2011,14 +2018,9 @@ export class GameEngine2D {
     // Ravens are rendered in screen space so they visibly cross in front of the moon.
     this.renderCrows(ctx);
 
-    // 3. Background silhouette: cedar-covered mountain range or a dedicated city skyline.
-    if (cityBiome !== null) {
-      this.renderCityBackdrop(ctx, width, height, cityBiome);
-    } else if (!isDesertBiome) {
-      this.renderCedarMountainRange(ctx, width, height);
-      this.renderDistantCastle(ctx, width, height, palette.accent);
-    }
-    }
+    // Procedural city silhouettes are intentionally disabled: use the approved Arabic assets.
+    } 
+    this.renderArabicCityLayers(ctx, width, height);
     }
 
     // Transform for World Coordinates with CINEMATIC CAMERA ZOOM
@@ -2076,14 +2078,14 @@ export class GameEngine2D {
     // Soft moonlit grassy ridge and fine blades along the silhouette.
     ctx.save();
     ctx.lineCap = 'round';
-    ctx.strokeStyle = isDesert ? 'rgba(255,218,151,0.82)' : isRoseMeadow ? 'rgba(255,190,230,0.72)' : 'rgba(111,157,105,0.58)'; ctx.lineWidth = 3;
+    ctx.strokeStyle = isDesert ? 'rgba(255,218,151,0.82)' : isRoseMeadow ? 'rgba(255,190,230,0.72)' : this.currentStageIndex === 0 ? 'rgba(0,0,0,0)' : 'rgba(111,157,105,0.58)'; ctx.lineWidth = 3;
     ctx.beginPath();
     for (let wx = groundLeft; wx <= groundRight; wx += 8) {
       const gy = this.terrainHeightAt(wx);
       if (wx === groundLeft) ctx.moveTo(wx, gy); else ctx.lineTo(wx, gy);
     }
     ctx.stroke();
-    for (let i = 0; !isDesert && i < Math.ceil(groundWidth / 13); i++) {
+    for (let i = 0; !isDesert && this.currentStageIndex !== 0 && i < Math.ceil(groundWidth / 13); i++) {
       const wx = groundLeft + i * 13;
       const gy = this.terrainHeightAt(wx);
       const h = 3 + ((i * 17) % 8);
