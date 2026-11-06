@@ -1827,9 +1827,6 @@ export class GameEngine2D {
     }
 
     this.drawWorld01Strip(ctx, '04_clouds_near.png', height * 0.105, height * 0.255, 0.052, 0.36);
-    this.drawWorld01Strip(ctx, '05_mountains_far.png', this.groundY - height * 0.12, height * 0.43, 0.035, 0.96, true);
-    this.drawWorld01Strip(ctx, '06_mountains_near.png', this.groundY - height * 0.055, height * 0.34, 0.075, 1, true);
-
   }
 
   /** Shared Arabic city and mountain layers, positioned from the actual landscape viewport. */
@@ -1854,7 +1851,6 @@ export class GameEngine2D {
 
     this.drawWorld01SpriteRow(ctx, 'palm', 12, horizon + 2, 520, 0.12, height * 0.34, 0.92);
     this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.29, 0.16, 0.88, true, true);
-  }
   }
 
   private render() {
@@ -2019,9 +2015,9 @@ export class GameEngine2D {
     this.renderCrows(ctx);
 
     // Procedural city silhouettes are intentionally disabled: use the approved Arabic assets.
-    } 
-    this.renderArabicCityLayers(ctx, width, height);
     }
+
+    this.renderArabicCityLayers(ctx, width, height);
 
     // Transform for World Coordinates with CINEMATIC CAMERA ZOOM
     ctx.save();
