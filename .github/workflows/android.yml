@@ -43,7 +43,7 @@ jobs:
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text()
           if 'android:screenOrientation="landscape"' not in text:
-              text, count = re.subn(r'<activity\\b', '<activity android:screenOrientation="landscape"', text, count=1)
+              text, count = re.subn(r'<activity\b', '<activity android:screenOrientation="landscape"', text, count=1)
               if count != 1:
                   raise SystemExit("Could not locate the Android launcher activity in AndroidManifest.xml")
               manifest.write_text(text)
