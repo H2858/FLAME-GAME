@@ -2016,6 +2016,7 @@ export class GameEngine2D {
 
     // Procedural city silhouettes are intentionally disabled: use the approved Arabic assets.
     }
+    }
 
     this.renderArabicCityLayers(ctx, width, height);
 
