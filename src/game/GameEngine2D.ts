@@ -1873,8 +1873,8 @@ export class GameEngine2D {
     // One approved Arabic world is used consistently in all 20 stages.
     this.renderWorld01Backdrop(ctx, width, height);
     this.renderArabicCityLayers(ctx, width, height);
-
-
+    // Preserve ravens as smaller flocks over the unified Arabic sky.
+    this.renderCrows(ctx);
 
     // Transform for World Coordinates with CINEMATIC CAMERA ZOOM
     ctx.save();
