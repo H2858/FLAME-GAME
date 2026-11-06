@@ -1831,7 +1831,7 @@ export class GameEngine2D {
 
   /** Shared Arabic city and mountain layers, positioned from the actual landscape viewport. */
   private renderArabicCityLayers(ctx: CanvasRenderingContext2D, width: number, height: number) {
-    const horizon = height * 0.835;
+    const horizon = Math.max(height * 0.58, Math.min(height * 0.88, this.groundY - this.cameraY));
     // Distant mountains first; the horizon is viewport-relative, never the 530px world floor.
     this.drawWorld01Strip(ctx, '05_mountains_far.png', horizon, height * 0.40, 0.025, 0.98, true);
     this.drawWorld01Strip(ctx, '06_mountains_near.png', horizon + height * 0.015, height * 0.31, 0.045, 1, true);
