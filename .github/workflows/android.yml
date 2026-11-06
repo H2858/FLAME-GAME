@@ -35,6 +35,21 @@ jobs:
           bunx cap init FLAME com.h2858.flame --web-dir dist
           bunx cap add android
 
+      - name: Force Android app to launch in landscape
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text()
+          if 'android:screenOrientation="landscape"' not in text:
+              text, count = re.subn(r'<activity\\b', '<activity android:screenOrientation="landscape"', text, count=1)
+              if count != 1:
+                  raise SystemExit("Could not locate the Android launcher activity in AndroidManifest.xml")
+              manifest.write_text(text)
+          print("Launcher activity is locked to landscape.")
+          PY
+
       - name: Build APK
         working-directory: android
         run: chmod +x gradlew && ./gradlew assembleDebug
