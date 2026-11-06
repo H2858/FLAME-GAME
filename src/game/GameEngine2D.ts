@@ -168,20 +168,9 @@ export class GameEngine2D {
   public groundY = 530;
 
   // Night-meadow route: rolling grassy ridges with a continuous safe floor.
-  private terrainHeightAt(worldX: number): number {
-    // World 01 uses a perfectly level stone walkway matching its visible art.
-    if (this.currentStageIndex === 0) return this.groundY;
-    // Desert routes follow broad dune crests; other biomes retain a restrained natural roll.
-    const desert = [2, 6, 12, 17].includes(this.currentStageIndex);
-    if (desert) {
-      return this.groundY + Math.sin(worldX * 0.00072 + 0.6) * 34 + Math.sin(worldX * 0.00155 + 1.8) * 13 + Math.sin(worldX * 0.0031) * 4;
-    }
-    // First-pass natural terrain profile: broad slopes plus restrained rocky variation.
-    // The player follows this sampled ground height through the normal gravity solver.
-    return this.groundY
-      + Math.sin(worldX * 0.00105 + 0.35) * 24
-      + Math.sin(worldX * 0.00235 + 1.1) * 9
-      + Math.sin(worldX * 0.0052 + 0.7) * 3;
+  private terrainHeightAt(_worldX: number): number {
+    // All twenty stages share the same perfectly level plaza floor.
+    return this.groundY;
   }
 
   private isSinkholeAt(_worldX: number): boolean { return false; }
@@ -381,6 +370,9 @@ export class GameEngine2D {
       const image = new Image(); image.src = `/assets/world01/sprites/${file}`;
       this.world01Assets[file] = image;
     }
+    const plaza = new Image();
+    plaza.src = '/assets/world01/plaza.webp';
+    this.world01Assets['plaza.webp'] = plaza;
     this.settings = initialSettings;
 
     this.onResize();
@@ -437,15 +429,8 @@ export class GameEngine2D {
   }
 
   private setupElevatedPlatforms() {
+    // Elevated platforms are permanently removed from the Arabic world.
     this.platforms = [];
-    for (let i = 0; i < 40; i++) {
-      this.platforms.push({
-        x: 480 + i * 440,
-        y: 370 - (i % 3) * 65,
-        width: 175,
-        height: 22,
-      });
-    }
   }
 
   /**
@@ -456,8 +441,7 @@ export class GameEngine2D {
     // Grounded stamina cores only. Flight pickups are removed from FLAME.
     for (let i = 0; i < 18; i++) {
       const x = 900 + i * 720 + Math.random() * 180;
-      const onPlatform = i % 3 === 1;
-      const y = onPlatform ? 330 : this.groundY - 35;
+      const y = this.groundY - 35;
 
       this.worldTokens.push({
         id: i + 1,
@@ -1844,48 +1828,26 @@ export class GameEngine2D {
     // trunks and crowns remain completely visible instead of being hidden by roofs.
     this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.38, 0.16, 1, true, true);
     this.drawWorld01Strip(ctx, '09_foreground_architecture.png', horizon + height * 0.018, height * 0.38, 0.16, 1, true, true);
-    this.drawWorld01SpriteRow(ctx, 'palm-new', 10, horizon + height * 0.075, 310, 0.12, height * 0.52, 1);
+    // Plant the palms at the plaza edge; the plaza artwork covers their lower trunks.
+    this.drawWorld01SpriteRow(ctx, 'palm-new', 10, this.groundY - this.cameraY, 310, 0.12, height * 0.48, 1);
   }
 
-  /** Continuous stone plaza between the fixed Arabic city and the rolling playfield. */
+  /** Repeats the supplied plaza artwork continuously across every stage. */
   private renderArabicPlaza(ctx: CanvasRenderingContext2D, left: number, right: number, height: number) {
-    const horizon = Math.max(height * 0.58, Math.min(height * 0.88, this.groundY - this.cameraY));
-    const topY = horizon + this.cameraY + height * 0.020;
-    const step = 10;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(left, topY);
-    ctx.lineTo(right, topY);
-    for (let wx = right; wx >= left; wx -= step) ctx.lineTo(wx, this.terrainHeightAt(wx));
-    ctx.closePath();
-    ctx.clip();
-
-    const stone = ctx.createLinearGradient(0, topY, 0, this.groundY + 190);
-    stone.addColorStop(0, '#5c5145');
-    stone.addColorStop(0.18, '#51483e');
-    stone.addColorStop(0.62, '#3d3934');
-    stone.addColorStop(1, '#292b2b');
-    ctx.fillStyle = stone;
-    ctx.fillRect(left, topY, right - left, height + this.cameraY + this.groundY + 260);
-
-    // Staggered paving joints and subtle bevel highlights give the plaza a solid surface.
-    for (let row = 0; row < 12; row++) {
-      const y = topY + 13 + row * 22;
-      ctx.strokeStyle = row % 2 === 0 ? 'rgba(224,197,151,0.15)' : 'rgba(12,16,18,0.24)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
-      const tile = 86;
-      const offset = (row % 2) * tile * 0.5;
-      for (let x = Math.floor(left / tile) * tile - tile + offset; x < right + tile; x += tile) {
-        ctx.strokeStyle = 'rgba(12,16,18,0.20)';
-        ctx.beginPath(); ctx.moveTo(x, y - 21); ctx.lineTo(x, y); ctx.stroke();
-      }
+    const image = this.world01Assets['plaza.webp'];
+    const floorY = this.groundY;
+    const bottomY = height + this.cameraY + 700;
+    ctx.fillStyle = '#292522';
+    ctx.fillRect(left, floorY, right - left, bottomY - floorY);
+    if (!image?.complete || image.naturalWidth === 0) return;
+    const scale = Math.max(1, height * 0.34 / image.naturalHeight);
+    const tileW = image.naturalWidth * scale;
+    const tileH = image.naturalHeight * scale;
+    const firstTile = Math.floor(left / tileW);
+    const lastTile = Math.ceil(right / tileW);
+    for (let tile = firstTile; tile <= lastTile; tile++) {
+      ctx.drawImage(image, tile * tileW, floorY, tileW, tileH);
     }
-    ctx.strokeStyle = 'rgba(230,197,143,0.58)';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(left, topY + 1); ctx.lineTo(right, topY + 1); ctx.stroke();
-    ctx.restore();
   }
 
   private render() {
@@ -1952,140 +1914,10 @@ export class GameEngine2D {
     }
     ctx.fillStyle = meadow; ctx.fill();
 
-    // Cover the entire space beneath the city with one opaque plaza surface.
+    // Replace all former biome ground decorations with the single supplied plaza.
     this.renderArabicPlaza(ctx, groundLeft, groundRight, height);
 
-    // Soft moonlit grassy ridge and fine blades along the silhouette.
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = isDesert ? 'rgba(255,218,151,0.82)' : isRoseMeadow ? 'rgba(255,190,230,0.72)' : this.currentStageIndex === 0 ? 'rgba(0,0,0,0)' : 'rgba(111,157,105,0.58)'; ctx.lineWidth = 3;
-    ctx.beginPath();
-    for (let wx = groundLeft; wx <= groundRight; wx += 8) {
-      const gy = this.terrainHeightAt(wx);
-      if (wx === groundLeft) ctx.moveTo(wx, gy); else ctx.lineTo(wx, gy);
-    }
-    ctx.stroke();
-    for (let i = 0; !isDesert && this.currentStageIndex !== 0 && i < Math.ceil(groundWidth / 13); i++) {
-      const wx = groundLeft + i * 13;
-      const gy = this.terrainHeightAt(wx);
-      const h = 3 + ((i * 17) % 8);
-      ctx.strokeStyle = isRoseMeadow ? (i % 3 === 0 ? 'rgba(255,205,235,0.78)' : 'rgba(198,112,174,0.72)') : (i % 3 === 0 ? 'rgba(116,170,105,0.62)' : 'rgba(57,105,65,0.55)');
-      ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(wx, gy + 1); ctx.lineTo(wx + ((i % 2) ? 2 : -2), gy - h); ctx.stroke();
-    }
-    // Desert grain, fixed cacti silhouettes and low dunes are world-anchored.
-    if (isDesert) {
-      ctx.save();
-      for (let i = 0; i < 110; i++) {
-        const wx = groundLeft + ((i * 97 + 23) % Math.max(1, groundWidth));
-        const gy = this.terrainHeightAt(wx) + 18 + ((i * 31) % 150);
-        ctx.fillStyle = i % 3 ? 'rgba(255,224,164,0.20)' : 'rgba(72,43,23,0.22)';
-        ctx.fillRect(wx, gy, 2 + (i % 2), 1.2);
-      }
-      const firstCactus = Math.floor(groundLeft / 1050) - 1;
-      const lastCactus = Math.ceil(groundRight / 1050) + 1;
-      for (let n = firstCactus; n <= lastCactus; n++) {
-        const cx = n * 1050 + 780; const cy = this.terrainHeightAt(cx) - 4;
-        const scale = 0.68 + ((n % 3 + 3) % 3) * 0.14;
-        ctx.save(); ctx.translate(cx, cy); ctx.scale(scale, scale);
-        ctx.fillStyle = '#244333'; ctx.strokeStyle = 'rgba(151,177,119,0.38)'; ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.moveTo(-10, 0); ctx.bezierCurveTo(-12, -28, -11, -66, -7, -91);
-        ctx.quadraticCurveTo(-4, -101, 2, -98); ctx.quadraticCurveTo(9, -96, 8, -86);
-        ctx.bezierCurveTo(5, -55, 8, -24, 10, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-        // Rounded arms grow organically from the trunk instead of square blocks.
-        ctx.beginPath(); ctx.moveTo(-8, -39); ctx.bezierCurveTo(-26, -40, -30, -49, -29, -63);
-        ctx.quadraticCurveTo(-28, -72, -22, -72); ctx.quadraticCurveTo(-15, -72, -16, -63);
-        ctx.bezierCurveTo(-16, -54, -13, -51, -7, -51); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(7, -55); ctx.bezierCurveTo(24, -56, 28, -65, 27, -78);
-        ctx.quadraticCurveTo(26, -87, 20, -87); ctx.quadraticCurveTo(13, -87, 14, -78);
-        ctx.bezierCurveTo(14, -69, 12, -67, 7, -67); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.strokeStyle = 'rgba(190,207,150,0.28)'; ctx.lineWidth = 1;
-        for (let rib = -5; rib <= 5; rib += 5) { ctx.beginPath(); ctx.moveTo(rib, -84); ctx.quadraticCurveTo(rib - 2, -48, rib + 1, -8); ctx.stroke(); }
-        ctx.restore();
-      }
-      this.renderSandWhirlwinds(ctx, groundLeft, groundRight);
-      ctx.restore();
-    }
-
-    if (isRoseMeadow) {
-      // Japanese spring grove: layered jacaranda/cherry-like crowns with soft pink blossom clusters.
-      const groveStart = Math.floor(groundLeft / 760) - 1;
-      const groveEnd = Math.ceil(groundRight / 760) + 1;
-      for (let tree = groveStart; tree <= groveEnd; tree++) {
-        const tx = tree * 760 + 340;
-        const ty = this.terrainHeightAt(tx) - 5;
-        ctx.save(); ctx.translate(tx, ty); ctx.globalAlpha = 0.78;
-        ctx.strokeStyle = '#342238'; ctx.lineWidth = 9; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-10, -42, 2, -94); ctx.moveTo(-2, -48); ctx.quadraticCurveTo(-42, -70, -55, -91); ctx.moveTo(0, -62); ctx.quadraticCurveTo(38, -76, 52, -102); ctx.stroke();
-        const clusters = [[-45,-92,25],[-20,-112,30],[12,-118,34],[43,-105,27],[0,-86,31],[-58,-76,18],[57,-82,19]];
-        for (let c = 0; c < clusters.length; c++) {
-          const [cx, cy, r] = clusters[c];
-          const bloom = ctx.createRadialGradient(cx - r * .25, cy - r * .3, 2, cx, cy, r);
-          bloom.addColorStop(0, '#ffe5f2'); bloom.addColorStop(.55, c % 2 ? '#f4a8d0' : '#e98bc2'); bloom.addColorStop(1, 'rgba(166,74,133,0.18)');
-          ctx.fillStyle = bloom; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-          for (let petal = 0; petal < 8; petal++) { const a = petal * Math.PI / 4; ctx.fillStyle = 'rgba(255,235,246,0.55)'; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r * .55, cy + Math.sin(a) * r * .55, 3.2, 0, Math.PI * 2); ctx.fill(); }
-        }
-        ctx.restore();
-      }
-      // Elegant distant Chinese courtyard roofs: layered tiled eaves, lanterns and pagoda silhouettes.
-      ctx.save(); ctx.globalAlpha=.58;
-      for(let house=0;house<5;house++){
-        const hx=groundLeft+((house*690+280-this.cameraX*.18)%(groundWidth+700));
-        const base=this.groundY-128-(house%2)*24; const scale=.72+(house%3)*.12;
-        ctx.translate(hx,base);ctx.scale(scale,scale);
-        ctx.fillStyle='#30253d';ctx.fillRect(-76,-52,152,54);
-        ctx.fillStyle='#49324f';ctx.beginPath();ctx.moveTo(-94,-51);ctx.quadraticCurveTo(-52,-62,-34,-93);ctx.quadraticCurveTo(0,-78,34,-93);ctx.quadraticCurveTo(52,-62,94,-51);ctx.lineTo(76,-43);ctx.quadraticCurveTo(0,-61,-76,-43);ctx.closePath();ctx.fill();
-        ctx.strokeStyle='#e7a5d0';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-94,-51);ctx.quadraticCurveTo(-52,-62,-34,-93);ctx.quadraticCurveTo(0,-78,34,-93);ctx.quadraticCurveTo(52,-62,94,-51);ctx.stroke();
-        ctx.fillStyle='#f4b6d7';ctx.fillRect(-48,-35,18,37);ctx.fillRect(30,-35,18,37);
-        ctx.fillStyle='rgba(255,190,110,.85)';ctx.fillRect(-5,-32,10,24);
-        ctx.fillStyle='#9d4e88';ctx.fillRect(-2,-111,4,18);ctx.beginPath();ctx.arc(0,-112,4,0,Math.PI*2);ctx.fill();
-        ctx.setTransform(1,0,0,1,0,0);
-      }
-      ctx.restore();
-      // Tiny flowers and drifting petals make the pink meadow feel alive without obscuring combat.
-      for (let f = 0; f < 72; f++) {
-        const wx = groundLeft + ((f * 113 + 41) % Math.max(1, groundWidth));
-        const gy = this.terrainHeightAt(wx) + 10 + (f % 5) * 13;
-        ctx.fillStyle = f % 3 ? 'rgba(255,190,226,0.72)' : 'rgba(255,239,248,0.82)';
-        ctx.beginPath(); ctx.arc(wx, gy, 1.5 + (f % 2), 0, Math.PI * 2); ctx.fill();
-      }
-      for (let petal = 0; petal < 18; petal++) {
-        const px = groundLeft + ((petal * 173 + this.flameTimer * (13 + petal % 4 * 4)) % Math.max(1, groundWidth));
-        const py = this.terrainHeightAt(px) - 70 - ((petal * 37 + this.flameTimer * 9) % 115);
-        ctx.save(); ctx.translate(px, py); ctx.rotate(this.flameTimer * .7 + petal);
-        ctx.fillStyle = 'rgba(255,190,224,0.72)'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 2.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-      }
-    }
-
-    if (isStoneBiome) {
-      // Irregular old-city stone paving: staggered joints, bevel highlights and subtle wear.
-      const rowH = 30;
-      for (let row = 0; row < 9; row++) {
-        const y = this.groundY + row * rowH + 8;
-        const tileW = 76 + (row % 3) * 8;
-        const offset = (row % 2) * tileW * 0.5 - (groundLeft % tileW);
-        for (let col = -2; col < Math.ceil(groundWidth / tileW) + 3; col++) {
-          const x = groundLeft + col * tileW + offset;
-          ctx.fillStyle = `rgba(180,190,198,${0.035 + (col + row) % 3 * 0.012})`;
-          ctx.beginPath(); ctx.roundRect(x + 2, y + 2, tileW - 5, rowH - 5, 3); ctx.fill();
-          ctx.strokeStyle = 'rgba(5,9,15,0.48)'; ctx.lineWidth = 1.2; ctx.stroke();
-          ctx.strokeStyle = 'rgba(220,228,232,0.08)'; ctx.beginPath(); ctx.moveTo(x + 5, y + 4); ctx.lineTo(x + tileW - 9, y + 4); ctx.stroke();
-        }
-      }
-    }
-    // Sparse dew glints, subdued so the playfield stays clear.
-    for (let i = 0; !isDesert && this.currentStageIndex !== 0 && i < 24; i++) {
-      const wx = groundLeft + ((i * 137 + 31) % Math.max(1, groundWidth));
-      const gy = this.terrainHeightAt(wx) + 8 + (i % 5) * 11;
-      ctx.fillStyle = isRoseMeadow ? `rgba(255,190,226,${0.15 + (i % 3) * 0.05})` : `rgba(139,190,126,${0.12 + (i % 3) * 0.05})`;
-      ctx.beginPath(); ctx.arc(wx, gy, 1 + (i % 2), 0, Math.PI * 2); ctx.fill();
-    }
-    // The continuous plaza replaces the oversized terrain-following floor tiles,
-    // which previously created visible seams and overlaps.
-    ctx.restore();
-
-    // 6. FLOATING MONOLITHS WITH LUMINOUS NEON STRIPS
-    this.renderNeonPlatforms(ctx);
+    // Elevated monolith platforms and their visual surfaces are removed.
 
     // 7. COLLECTIBLE TOKENS ON ROAD (Flight Rune & Stamina Core)
     this.renderWorldTokens(ctx);
